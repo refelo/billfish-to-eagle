@@ -21,37 +21,28 @@ from pathlib import Path
 # 配置区
 # ============================================================
 MIGRATIONS = [
-    {
-        "bf_db":   r"E:\本地资源库\.bf\billfish.db",
-        "bf_root": r"E:\本地资源库",
-        "eagle_lib_name": "eagle—绘画.library",
-        "label": "绘画",
-    },
-    {
-        "bf_db":   r"E:\摄影\.bf\billfish.db",
-        "bf_root": r"E:\摄影",
-        "eagle_lib_name": "eagle—摄影.library",
-        "label": "摄影",
-    },
+    # 示例配置——请修改为你的实际路径
+    # {
+    #     "bf_db":   r"X:\资源库名\.bf\billfish.db",
+    #     "bf_root": r"X:\资源库名",
+    #     "eagle_lib_name": "eagle—绘画.library",
+    #     "label": "绘画",
+    # },
 ]
 
 
 def find_eagle_lib(dir_name):
     """在 E:/ 下按名称匹配 Eagle 库（处理 emdash 等特殊字符）"""
     parent = "E:\\"
-    name_base = dir_name.replace(".library", "")
+    name_base = dir_name.replace(".library", "").replace("\u2014", "").replace("-", "").lower()
     for entry in os.listdir(parent):
         if entry.endswith(".library"):
-            # 用关键词匹配
-            entry_base = entry.replace(".library", "")
-            if "绘画" in entry_base and "绘画" in name_base:
+            entry_base = entry.replace(".library", "").replace("\u2014", "").replace("-", "").lower()
+            if name_base in entry_base or entry_base in name_base:
                 return os.path.join(parent, entry)
-            if "摄影" in entry_base and "摄影" in name_base:
-                return os.path.join(parent, entry)
-    # fallback: 按 library 名精确匹配
     candidate = os.path.join(parent, dir_name)
     return candidate if os.path.exists(candidate) else None
-# 保持 Billfish 标签层级: "父/子" 格式 + 每级保留独立父标签
+
 
 
 def id_generator():
@@ -174,7 +165,7 @@ def read_billfish(db_path, lib_root):
         # 构建完整文件路径
         if folder_path:
             abs_path = os.path.join(lib_root, folder_path, fname)
-            rel_path = folder_path + "/" + fname
+            rel_path = os.path.join(folder_path, fname)
         else:
             abs_path = os.path.join(lib_root, fname)
             rel_path = fname

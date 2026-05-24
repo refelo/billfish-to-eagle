@@ -171,7 +171,6 @@ def read_billfish(db_path, lib_root, filter_mode, filter_tags_str,
     file_rows = c.fetchall()
 
     # 用户数据
-    udata_map = {"score": 0, "note": "", "origin": ""}
     full_udata = {}
     try:
         for r in c.execute("SELECT file_id, score, note, origin FROM bf_material_userdata"):
@@ -190,7 +189,7 @@ def read_billfish(db_path, lib_root, filter_mode, filter_tags_str,
         fname = row["name"]
         folder_path = get_folder_path(row["folder_id"])
         filesize = row["file_size"] or 0
-        ud = full_udata.get(fid, udata_map)
+        ud = full_udata.get(fid, {})
 
         abs_path = os.path.join(lib_root, folder_path, fname) if folder_path else os.path.join(lib_root, fname)
         if not os.path.exists(abs_path):
@@ -209,16 +208,20 @@ def read_billfish(db_path, lib_root, filter_mode, filter_tags_str,
                     tags.append(sanitize_text(tag_name[tid]))
         tags = sorted(set(tags))
 
-        url = str(ud["origin"]) if ud["origin"] and str(ud["origin"]).startswith("http") else ""
+        url = ud.get("origin", "")
+        if url and str(url).startswith("http"):
+            url = str(url)
+        else:
+            url = ""
 
         items.append({
             "file_id": fid,
             "filename": fname,
             "abs_path": abs_path,
             "size": filesize,
-            "score": ud["score"] if export_score else 0,
+            "score": ud.get("score", 0) if export_score else 0,
             "tags": tags,
-            "note": ud["note"] if export_note else "",
+            "note": ud.get("note", "") if export_note else "",
             "url": url,
             "fhash": file_hash(abs_path),
         })

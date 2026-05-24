@@ -4,26 +4,28 @@ Eagle 评分补充脚本（备用）
 前提：Eagle App 已打开并切到目标库。
 用法：
     python apply_stars.py
+依赖: 仅标准库
 """
-import os, json, requests, time
+import os, json, time, urllib.request, urllib.error
 
 EAGLE_API = "http://localhost:41595"
 
 
-def apply_stars(lib_name):
-    """为指定 Eagle 库中所有有 star 字段的 metadata.json 通过 API 写入评分"""
+def find_eagle_lib(lib_name):
+    """在 E:/ 下按名称匹配 Eagle 库"""
     parent = "E:\\"
-    lib_path = None
+    name_base = lib_name.replace(".library", "").replace("\u2014", "").replace("-", "")
     for entry in os.listdir(parent):
         if entry.endswith(".library"):
-            ek = entry.replace(".library", "")
-            nk = lib_name.replace(".library", "")
-            for c in nk:
-                if c in ek and len(c) > 1:
-                    lib_path = os.path.join(parent, entry)
-                    break
-        if lib_path:
-            break
+            entry_base = entry.replace(".library", "").replace("\u2014", "").replace("-", "")
+            if name_base in entry_base or entry_base in name_base:
+                return os.path.join(parent, entry)
+    return None
+
+
+def apply_stars(lib_name):
+    """为指定 Eagle 库中所有有 star 字段的 metadata.json 通过 API 写入评分"""
+    lib_path = find_eagle_lib(lib_name)
     if not lib_path:
         print(f"未找到库: {lib_name}")
         return
@@ -54,21 +56,20 @@ def apply_stars(lib_name):
             continue
 
         try:
-            resp = requests.post(
+            data = json.dumps({"id": eid, "star": star}).encode("utf-8")
+            req = urllib.request.Request(
                 f"{EAGLE_API}/api/item/update",
-                json={"id": eid, "star": star},
-                timeout=10,
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
             )
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("status") == "success":
-                    processed += 1
-                    # 从 metadata.json 中移除 star 字段（避免重复处理）
-                    del meta["star"]
-                    with open(meta_path, "w", encoding="utf-8") as f:
-                        json.dump(meta, f, ensure_ascii=False, indent=2)
-                else:
-                    failures += 1
+            resp = urllib.request.urlopen(req, timeout=10)
+            result = json.loads(resp.read().decode("utf-8"))
+            if result.get("status") == "success":
+                processed += 1
+                del meta["star"]
+                with open(meta_path, "w", encoding="utf-8") as f:
+                    json.dump(meta, f, ensure_ascii=False, indent=2)
             else:
                 failures += 1
         except Exception as e:
@@ -76,10 +77,10 @@ def apply_stars(lib_name):
             print(f"  错误: {e}")
             break
 
-        if processed % 100 == 0:
+        if processed % 100 == 0 and processed > 0:
             print(f"  [{lib_name}] {processed} stars applied, {failures} failed")
 
-        time.sleep(0.05)  # 避免压垮 API
+        time.sleep(0.05)
 
     print(f"[{lib_name}] 完成: {processed} 条评分写入, {failures} 失败 / 共 {total}")
 
